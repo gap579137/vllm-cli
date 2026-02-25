@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .base import CompositeValidator, DependencyValidator
+from .base import CompositeValidator
 from .factory import (
     create_boolean_validator,
     create_choice_validator,
@@ -27,208 +27,23 @@ from .registry import ValidationRegistry
 logger = logging.getLogger(__name__)
 
 
-def create_vllm_validation_registry() -> ValidationRegistry:
+def create_vllm_validation_registry() -> "PydanticValidationRegistry":
     """
     Create a validation registry for vLLM configuration parameters.
 
-    This function builds a comprehensive validation registry based on
-    the vLLM argument schema, providing type checking, range validation,
-    and dependency checking for all supported parameters.
+    Uses the Pydantic-based VLLMConfig model for type checking, range
+    validation, and dependency checking for all supported parameters.
 
     Returns:
-        ValidationRegistry configured for vLLM parameters
+        PydanticValidationRegistry backed by VLLMConfig
     """
-    registry = ValidationRegistry()
+    from .pydantic_models import create_pydantic_validation_registry
 
-    # Core server parameters
-    registry.register("port", validate_port_number("port"))
-
-    registry.register("host", create_string_validator("host", min_length=1))
-
-    # Model parameters
-    registry.register(
-        "dtype",
-        create_choice_validator("dtype", ["auto", "float16", "bfloat16", "float32"]),
-    )
-
-    # max_model_len is optional - if not specified, vLLM uses model's native max
-    registry.register(
-        "max_model_len",
-        create_integer_validator("max_model_len", min_value=1, required=False),
-    )
-
-    registry.register("max_num_seqs", validate_positive_integer("max_num_seqs"))
-
-    # Parallelism parameters
-    registry.register(
-        "tensor_parallel_size", validate_positive_integer("tensor_parallel_size")
-    )
-
-    registry.register(
-        "pipeline_parallel_size", validate_positive_integer("pipeline_parallel_size")
-    )
-
-    # Memory management
-    registry.register(
-        "gpu_memory_utilization", validate_probability("gpu_memory_utilization")
-    )
-
-    registry.register(
-        "max_num_batched_tokens", validate_positive_integer("max_num_batched_tokens")
-    )
-
-    registry.register("max_paddings", validate_non_negative_integer("max_paddings"))
-
-    # Quantization parameters
-    registry.register(
-        "quantization",
-        create_choice_validator(
-            "quantization",
-            [
-                "awq",
-                "awq_marlin",
-                "gptq",
-                "gptq_marlin",
-                "bitsandbytes",
-                "fp8",
-                "gguf",
-                "compressed-tensors",
-            ],
-        ),
-    )
-
-    # KV Cache parameters
-    registry.register(
-        "kv_cache_dtype",
-        create_choice_validator("kv_cache_dtype", ["auto", "fp8", "fp16", "bf16"]),
-    )
-
-    registry.register(
-        "block_size", create_integer_validator("block_size", min_value=1, max_value=256)
-    )
-
-    # Attention parameters
-    registry.register(
-        "enable_prefix_caching", create_boolean_validator("enable_prefix_caching")
-    )
-
-    registry.register(
-        "enable_chunked_prefill", create_boolean_validator("enable_chunked_prefill")
-    )
-
-    registry.register(
-        "max_num_on_the_fly_seq_groups",
-        validate_positive_integer("max_num_on_the_fly_seq_groups"),
-    )
-
-    # Performance parameters
-    registry.register("enforce_eager", create_boolean_validator("enforce_eager"))
-
-    registry.register(
-        "max_context_len_to_capture",
-        validate_positive_integer("max_context_len_to_capture"),
-    )
-
-    # Loading parameters
-    registry.register(
-        "load_format",
-        create_choice_validator(
-            "load_format", ["auto", "pt", "safetensors", "npcache", "dummy"]
-        ),
-    )
-
-    registry.register(
-        "download_dir", create_string_validator("download_dir", min_length=1)
-    )
-
-    # CPU offloading
-    registry.register(
-        "cpu_offload_gb", create_float_validator("cpu_offload_gb", min_value=0.0)
-    )
-
-    # Trust and safety parameters
-    registry.register(
-        "trust_remote_code", create_boolean_validator("trust_remote_code")
-    )
-
-    registry.register(
-        "disable_log_stats", create_boolean_validator("disable_log_stats")
-    )
-
-    registry.register(
-        "disable_log_requests", create_boolean_validator("disable_log_requests")
-    )
-
-    # Advanced parameters
-    registry.register("revision", create_string_validator("revision", min_length=1))
-
-    registry.register(
-        "tokenizer_revision",
-        create_string_validator("tokenizer_revision", min_length=1),
-    )
-
-    registry.register("seed", create_integer_validator("seed", min_value=0))
-
-    # Worker and distribution parameters
-    registry.register("worker_use_ray", create_boolean_validator("worker_use_ray"))
-
-    registry.register(
-        "ray_workers_use_nsight", create_boolean_validator("ray_workers_use_nsight")
-    )
-
-    # Speculative decoding
-    registry.register(
-        "speculative_model", create_string_validator("speculative_model", min_length=1)
-    )
-
-    registry.register(
-        "num_speculative_tokens", validate_positive_integer("num_speculative_tokens")
-    )
-
-    # LoRA parameters
-    registry.register("enable_lora", create_boolean_validator("enable_lora"))
-
-    registry.register("max_loras", validate_positive_integer("max_loras"))
-
-    registry.register("max_lora_rank", validate_positive_integer("max_lora_rank"))
-
-    registry.register(
-        "lora_extra_vocab_size", validate_non_negative_integer("lora_extra_vocab_size")
-    )
-
-    # Add dependency validators
-    _add_dependency_validators(registry)
-
-    return registry
+    return create_pydantic_validation_registry()
 
 
-def _add_dependency_validators(registry: ValidationRegistry) -> None:
-    """
-    Add dependency validators for parameters that require other parameters.
-
-    Args:
-        registry: ValidationRegistry to add dependencies to
-    """
-    # LoRA dependencies
-    lora_dependent_params = ["max_loras", "max_lora_rank", "lora_extra_vocab_size"]
-    for param in lora_dependent_params:
-        validator = registry.get_validator(param)
-        if validator:
-            validator.add_validator(DependencyValidator(param, ["enable_lora"]))
-
-    # Speculative decoding dependencies
-    spec_dependent_params = ["num_speculative_tokens"]
-    for param in spec_dependent_params:
-        validator = registry.get_validator(param)
-        if validator:
-            validator.add_validator(DependencyValidator(param, ["speculative_model"]))
-
-    # Ray dependencies
-    ray_dependent_params = ["ray_workers_use_nsight"]
-    for param in ray_dependent_params:
-        validator = registry.get_validator(param)
-        if validator:
-            validator.add_validator(DependencyValidator(param, ["worker_use_ray"]))
+# Keep legacy alias importable for backward-compat
+_add_dependency_validators = None  # no longer needed; deps live in VLLMConfig model_validator
 
 
 def create_compatibility_validator(

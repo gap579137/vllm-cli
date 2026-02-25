@@ -8,7 +8,6 @@ vLLM server instances including configuration, lifecycle, and monitoring.
 import logging
 import os
 import shlex
-import signal
 import subprocess
 import time
 from datetime import datetime
@@ -18,6 +17,14 @@ from threading import Thread
 from typing import Any, Dict, List, Optional, TextIO, Union
 
 from ..config import ConfigManager
+from .platform import (
+    check_process_alive,
+    graceful_stop_process,
+    graceful_stop_process_group,
+    send_signal_to_process,
+    send_signal_to_process_group,
+    start_subprocess_platform,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,10 +181,8 @@ class VLLMServer:
                 env["VLLM_SERVER_DEV_MODE"] = "1"
                 logger.info("Sleep mode enabled with development endpoints")
 
-            # Start the process with proper pipe configuration
-            # Use start_new_session=True to create a new process group
-            # This prevents the child process from receiving Ctrl+C signals
-            self.process = subprocess.Popen(
+            # Start the process with platform-appropriate process group isolation
+            self.process = start_subprocess_platform(
                 full_cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -185,7 +190,6 @@ class VLLMServer:
                 bufsize=0,  # Unbuffered
                 universal_newlines=True,
                 env=env,
-                start_new_session=True,  # Create new process group to isolate from parent signals
             )
 
             # Start log monitoring thread
@@ -361,6 +365,9 @@ class VLLMServer:
         """
         Stop the vLLM server.
 
+        Uses platform-abstracted process management to gracefully stop
+        the server (SIGTERM → wait → SIGKILL on POSIX, taskkill on Windows).
+
         Returns:
             True if server stopped successfully, False otherwise
         """
@@ -368,108 +375,39 @@ class VLLMServer:
             return False
 
         try:
-            # Check if this is an external server
             if hasattr(self.process, "terminate"):
-                # Normal subprocess
-                # Since we created a new session, we need to terminate the entire process group
-                try:
-                    # Get the process group ID (pgid)
-                    # Since we used start_new_session=True, the pgid is the same as the pid
-                    pgid = self.process.pid
+                # Normal subprocess — stop the entire process group
+                pgid = self.process.pid
+                logger.info(f"Stopping process group {pgid}")
+                graceful_stop_process_group(
+                    pgid,
+                    timeout=10.0,
+                    wait_fn=self.process.wait,
+                )
 
-                    # Send SIGTERM to the entire process group for graceful shutdown
-                    logger.info(f"Sending SIGTERM to process group {pgid}")
-                    os.killpg(pgid, signal.SIGTERM)
-
-                    # Wait for process to terminate
-                    try:
-                        self.process.wait(timeout=10)
-                        logger.info(f"Process group {pgid} terminated gracefully")
-                    except subprocess.TimeoutExpired:
-                        # Force kill if not terminated
-                        logger.warning(
-                            f"Process group {pgid} did not terminate, sending SIGKILL"
-                        )
-                        os.killpg(pgid, signal.SIGKILL)
-                        self.process.wait()
-                        logger.info(f"Process group {pgid} force killed")
-
-                except ProcessLookupError:
-                    # Process already dead
-                    logger.info("Process already terminated")
-                except PermissionError as e:
-                    # Fall back to terminating just the process
-                    logger.warning(
-                        f"Permission denied for process group kill: {e}, falling back to process termination"
-                    )
-                    self.process.terminate()
-                    try:
-                        self.process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        self.process.kill()
-                        self.process.wait()
             elif hasattr(self.process, "pid"):
-                # External server - kill entire process group or individual process
-                try:
-                    pgid = self.process.pid
-                    killed = False
+                # External server — try group first, fall back to individual
+                pgid = self.process.pid
+                killed = send_signal_to_process_group(pgid, forceful=False)
 
-                    # First attempt: try to kill process group
+                if not killed:
+                    # Process group kill failed, try individual process
                     try:
-                        os.killpg(pgid, signal.SIGTERM)
-                        logger.info(f"Sent SIGTERM to process group {pgid}")
-                        killed = True
-                    except (OSError, ProcessLookupError) as e:
-                        # Process group kill failed, try individual process
-                        logger.debug(
-                            f"Process group kill failed: {e}, trying individual process"
-                        )
-                        try:
-                            # Ensure pid is an integer (handle Mock objects)
-                            pid = int(self.process.pid)
-                            os.kill(pid, signal.SIGTERM)
-                            logger.info(f"Sent SIGTERM to process {self.process.pid}")
-                            killed = True
-                        except ProcessLookupError:
-                            # Process already dead
-                            logger.info(
-                                f"Process {self.process.pid} already terminated"
-                            )
-                        except OSError as e:
-                            logger.warning(
-                                f"Failed to send SIGTERM to {self.process.pid}: {e}"
-                            )
+                        pid = int(self.process.pid)
+                        killed = send_signal_to_process(pid, forceful=False)
+                    except (TypeError, ValueError):
+                        pass  # PID is not a valid integer (e.g. Mock in tests)
 
-                    if killed:
-                        # Wait for graceful shutdown
-                        time.sleep(2)
-
-                        # Check if still running and force kill if needed
-                        if self.is_running():
+                if killed:
+                    time.sleep(2)
+                    if self.is_running():
+                        # Escalate to forceful
+                        if not send_signal_to_process_group(pgid, forceful=True):
                             try:
-                                os.killpg(pgid, signal.SIGKILL)
-                                logger.info(f"Force killed process group {pgid}")
-                            except (OSError, ProcessLookupError):
-                                # Process group kill failed, try individual
-                                try:
-                                    # Ensure pid is an integer (handle Mock objects in tests)
-                                    if hasattr(self.process, "pid"):
-                                        try:
-                                            pid = int(self.process.pid)
-                                            os.kill(pid, signal.SIGKILL)
-                                            logger.info(f"Force killed process {pid}")
-                                        except (TypeError, ValueError):
-                                            # PID is not a valid integer (might be Mock)
-                                            pass
-                                except ProcessLookupError:
-                                    pass  # Already dead
-                                except OSError as e:
-                                    logger.error(
-                                        f"Failed to force kill {self.process.pid}: {e}"
-                                    )
-
-                except Exception as e:
-                    logger.error(f"Unexpected error stopping external server: {e}")
+                                pid = int(self.process.pid)
+                                send_signal_to_process(pid, forceful=True)
+                            except (TypeError, ValueError):
+                                pass
 
             # Close log file if we have one
             if hasattr(self, "log_file") and self.log_file:
@@ -497,23 +435,13 @@ class VLLMServer:
         if not self.process:
             return False
 
-        # Check if this is an external server (detected, not started by us)
+        # Normal subprocess
         if hasattr(self.process, "poll"):
-            # Normal subprocess
             return self.process.poll() is None
-        elif hasattr(self.process, "pid"):
-            # External server - check if PID still exists
-            try:
-                import psutil
 
-                return psutil.pid_exists(self.process.pid)
-            except ImportError:
-                # Fallback to os method
-                try:
-                    os.kill(self.process.pid, 0)
-                    return True
-                except (OSError, ProcessLookupError):
-                    return False
+        # External server — use platform helper
+        if hasattr(self.process, "pid"):
+            return check_process_alive(self.process.pid)
 
         return False
 

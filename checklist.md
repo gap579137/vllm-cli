@@ -73,16 +73,22 @@
 
 ## Phase 5: Architecture Improvements (1–2 days)
 
-- [ ] **Leverage Pydantic for config validation**
-  - Evaluate replacing custom validation framework with Pydantic models
-  - Pydantic is already a dependency but barely used
-  - Would reduce code in `validation/` package significantly
-  - Keep backward compatibility with existing config files
-- [ ] **Abstract platform-specific process management**
-  - Create `server/platform.py` with OS-detection
-  - Wrap `os.killpg()` / `signal.SIGTERM` / `signal.SIGKILL` in platform helpers
-  - Handle Windows `CREATE_NEW_PROCESS_GROUP` / `taskkill` equivalents
-  - Gate cross-platform support based on vLLM availability
+- [x] **Leverage Pydantic for config validation**
+  - ✅ Created `validation/pydantic_models.py` with `VLLMConfig` Pydantic model
+  - ✅ `PydanticValidationRegistry` adapter is a drop-in replacement for old `ValidationRegistry`
+  - ✅ `create_vllm_validation_registry()` now returns Pydantic-backed registry
+  - ✅ All 35+ fields validated with `field_validator(mode="before")` for correct coercion
+  - ✅ Cross-field dependency checks via `model_validator(mode="after")`
+  - ✅ 101 tests in `test_pydantic_validation.py`, full backward compat maintained
+  - ✅ Old framework files (`base.py`, `types.py`, `factory.py`, `registry.py`) kept for `load_validation_schema_from_file` utility
+- [x] **Abstract platform-specific process management**
+  - ✅ Created `server/platform.py` with OS-detection (`is_posix()`, `is_windows()`)
+  - ✅ Wrapped `os.killpg()` / `os.kill()` / signals in `send_signal_to_process()` / `send_signal_to_process_group()`
+  - ✅ High-level helpers: `graceful_stop_process_group()`, `graceful_stop_process()`, `start_subprocess_platform()`
+  - ✅ Windows path stubs using `taskkill` / `CREATE_NEW_PROCESS_GROUP`
+  - ✅ Refactored `server/manager.py` to use platform helpers (removed ~70 lines of raw signal code)
+  - ✅ Refactored `server/monitoring.py` to use `check_process_alive()`
+  - ✅ 21 tests in `test_platform.py` including real subprocess integration tests
 - [ ] **Add integration tests for proxy server**
   - Use `TestClient` from FastAPI for in-process testing
   - Test model registration/unregistration lifecycle

@@ -66,18 +66,9 @@ def _check_process_health(server: "VLLMServer") -> bool:
         if hasattr(server.process, "poll"):
             return server.process.poll() is None
         elif hasattr(server.process, "pid"):
-            try:
-                import psutil
+            from .platform import check_process_alive
 
-                return psutil.pid_exists(server.process.pid)
-            except ImportError:
-                import os
-
-                try:
-                    os.kill(server.process.pid, 0)
-                    return True
-                except (OSError, ProcessLookupError):
-                    return False
+            return check_process_alive(server.process.pid)
 
         return False
     except Exception as e:

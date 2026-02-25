@@ -66,6 +66,13 @@ from .types import (
     StringValidator,
 )
 
+# Pydantic-based validation (Phase 5)
+from .pydantic_models import (
+    PydanticValidationRegistry,
+    VLLMConfig,
+    create_pydantic_validation_registry,
+)
+
 __all__ = [
     # Base classes
     "ValidationError",
@@ -102,6 +109,10 @@ __all__ = [
     "create_compatibility_validator",
     "CompatibilityValidator",
     "load_validation_schema_from_file",
+    # Pydantic models
+    "VLLMConfig",
+    "PydanticValidationRegistry",
+    "create_pydantic_validation_registry",
     # Token validation
     "validate_hf_token",
     "get_token_info",

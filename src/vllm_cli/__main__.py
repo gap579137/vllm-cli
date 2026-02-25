@@ -40,7 +40,7 @@ def main() -> NoReturn:
         if not check_system_requirements():
             # Check specifically what's missing to provide helpful error message
             try:
-                pass
+                import torch  # noqa: F401
             except ImportError:
                 console.print(
                     "[red bold]System requirements not met:[/red bold]\n"

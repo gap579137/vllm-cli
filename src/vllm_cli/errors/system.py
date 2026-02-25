@@ -10,7 +10,7 @@ from typing import Optional
 from .base import VLLMCLIError
 
 
-class SystemError(VLLMCLIError):
+class VLLMSystemError(VLLMCLIError):
     """Base class for system-related errors."""
 
     def __init__(self, message: str, system_component: Optional[str] = None, **kwargs):
@@ -22,7 +22,7 @@ class SystemError(VLLMCLIError):
         return "System error occurred. Check system requirements and permissions."
 
 
-class GPUError(SystemError):
+class GPUError(VLLMSystemError):
     """GPU-related operation error."""
 
     def __init__(
@@ -76,7 +76,7 @@ class GPUMemoryError(GPUError):
         return "Insufficient GPU memory. Reduce model size or use quantization."
 
 
-class CUDAError(SystemError):
+class CUDAError(VLLMSystemError):
     """CUDA-related error."""
 
     def __init__(self, message: str, cuda_version: Optional[str] = None, **kwargs):
@@ -90,7 +90,7 @@ class CUDAError(SystemError):
         return "CUDA error. Check CUDA installation and compatibility."
 
 
-class DependencyError(SystemError):
+class DependencyError(VLLMSystemError):
     """Missing or incompatible dependency."""
 
     def __init__(
@@ -114,7 +114,7 @@ class DependencyError(SystemError):
         return f"Missing or incompatible {dep_name}. Install required dependencies."
 
 
-class FileSystemError(SystemError):
+class FileSystemError(VLLMSystemError):
     """File system operation error."""
 
     def __init__(
@@ -135,7 +135,7 @@ class FileSystemError(SystemError):
         return f"{operation} failed. Check file permissions and disk space."
 
 
-class PermissionError(FileSystemError):
+class VLLMPermissionError(FileSystemError):
     """Permission denied for file or directory access."""
 
     def __init__(self, message: str, **kwargs):
@@ -166,7 +166,7 @@ class DiskSpaceError(FileSystemError):
         return "Insufficient disk space. Free up space and try again."
 
 
-class MemoryError(SystemError):
+class VLLMMemoryError(VLLMSystemError):
     """System memory error."""
 
     def __init__(
@@ -189,7 +189,7 @@ class MemoryError(SystemError):
         return f"Insufficient {memory_type} memory. Close other applications or upgrade hardware."
 
 
-class NetworkError(SystemError):
+class NetworkError(VLLMSystemError):
     """Network connectivity error."""
 
     def __init__(
@@ -209,7 +209,7 @@ class NetworkError(SystemError):
         return "Network error. Check internet connection and try again."
 
 
-class EnvironmentError(SystemError):
+class VLLMEnvironmentError(VLLMSystemError):
     """System environment configuration error."""
 
     def __init__(
@@ -232,7 +232,7 @@ class EnvironmentError(SystemError):
         return "System environment not properly configured."
 
 
-class ProcessError(SystemError):
+class ProcessError(VLLMSystemError):
     """System process operation error."""
 
     def __init__(

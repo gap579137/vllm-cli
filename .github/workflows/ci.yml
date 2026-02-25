@@ -37,7 +37,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Cache pip packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
@@ -68,7 +68,7 @@ jobs:
         python-version: '3.11'
 
     - name: Cache pip packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-lint-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
@@ -86,7 +86,7 @@ jobs:
         flake8 src/vllm_cli --count --select=E9,F63,F7,F82 --show-source --statistics
         # Check for complexity and style issues (non-blocking)
         flake8 src/vllm_cli --count --exit-zero --max-complexity=15 --max-line-length=120 --statistics
-      continue-on-error: true  # Don't block on style issues
+      continue-on-error: false  # Lint issues should block merges
 
   format:
     name: Format Check
@@ -108,7 +108,7 @@ jobs:
     - name: Check formatting with black
       run: |
         black --check --diff src/vllm_cli --line-length 88
-      continue-on-error: true  # Formatting issues are non-blocking
+      continue-on-error: false  # Formatting should be consistent
 
   type-check:
     name: Type Check
@@ -123,7 +123,7 @@ jobs:
         python-version: '3.11'
 
     - name: Cache pip packages
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-type-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}

@@ -88,15 +88,15 @@ def _check_process_health(server: "VLLMServer") -> bool:
 def _check_http_health(server: "VLLMServer") -> bool:
     """Check if the server HTTP endpoint is responding."""
     try:
-        import requests
+        import httpx
 
         # Try to connect to the health endpoint
-        response = requests.get(f"http://localhost:{server.port}/health", timeout=5)
+        response = httpx.get(f"http://localhost:{server.port}/health", timeout=5)
 
         return response.status_code == 200
 
     except ImportError:
-        logger.debug("requests module not available for HTTP health check")
+        logger.debug("httpx module not available for HTTP health check")
         return False
     except Exception as e:
         logger.debug(f"HTTP health check failed: {e}")

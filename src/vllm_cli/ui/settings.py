@@ -376,10 +376,10 @@ def configure_hf_token() -> str:
         else:
             console.print("\n[cyan]Testing HuggingFace token...[/cyan]")
             try:
-                import requests
+                import httpx
 
                 # Use the HuggingFace whoami-v2 API endpoint
-                response = requests.get(
+                response = httpx.get(
                     "https://huggingface.co/api/whoami-v2",
                     headers={"Authorization": f"Bearer {current_token}"},
                     timeout=10,
@@ -410,10 +410,10 @@ def configure_hf_token() -> str:
                         f"[red]✗ Token validation failed (HTTP {response.status_code})[/red]"
                     )
                     console.print(f"[dim]Response: {response.text}[/dim]")
-            except requests.exceptions.Timeout:
+            except httpx.TimeoutException:
                 console.print("[red]Token test timed out[/red]")
                 console.print("[dim]Check your internet connection[/dim]")
-            except requests.exceptions.ConnectionError:
+            except httpx.ConnectError:
                 console.print("[red]Failed to connect to HuggingFace API[/red]")
                 console.print("[dim]Check your internet connection[/dim]")
             except Exception as e:

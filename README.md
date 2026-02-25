@@ -78,7 +78,7 @@ vLLM-CLI will not install vLLM or Pytorch by default.
 
 ### Installation
 
-#### Option 1: Install vLLM seperately and then install vLLM CLI (Recommended)
+#### Option 1: Install vLLM separately and then install vLLM CLI (Recommended)
 ```bash
 # Install vLLM -- Skip this step if you have vllm installed in your environment
 uv venv --python 3.12 --seed
@@ -103,7 +103,7 @@ pip install vllm-cli[vllm]
 vllm-cli
 ```
 
-#### Option 3: Build from source (You still need to install vLLM seperately)
+#### Option 3: Build from source (You still need to install vLLM separately)
 ```bash
 git clone https://github.com/Chen-zexi/vllm-cli.git
 cd vllm-cli

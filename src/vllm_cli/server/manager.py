@@ -163,7 +163,6 @@ class VLLMServer:
                         )
 
             # Add HuggingFace token if configured
-            config_manager = ConfigManager()
             hf_token = config_manager.config.get("hf_token")
             if hf_token:
                 env["HF_TOKEN"] = hf_token
@@ -734,10 +733,10 @@ class VLLMServer:
             return False
 
         try:
-            import requests
+            import httpx
 
             # Try to connect to the server
-            response = requests.get(f"http://localhost:{self.port}/health", timeout=5)
+            response = httpx.get(f"http://localhost:{self.port}/health", timeout=5)
 
             return response.status_code == 200
 

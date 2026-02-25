@@ -91,17 +91,23 @@ from .system import (
     CUDAError,
     DependencyError,
     DiskSpaceError,
-    EnvironmentError,
+    VLLMEnvironmentError,
     FileSystemError,
     GPUError,
     GPUMemoryError,
     GPUNotFoundError,
-    MemoryError,
+    VLLMMemoryError,
     NetworkError,
-    PermissionError,
+    VLLMPermissionError,
     ProcessError,
-    SystemError,
+    VLLMSystemError,
 )
+
+# Backward-compatible aliases (deprecated — prefer VLLM-prefixed names)
+SystemError = VLLMSystemError
+PermissionError = VLLMPermissionError
+MemoryError = VLLMMemoryError
+EnvironmentError = VLLMEnvironmentError
 
 __all__ = [
     # Base exceptions
@@ -144,19 +150,24 @@ __all__ = [
     "CompatibilityError",
     "DefaultsError",
     # System exceptions
-    "SystemError",
+    "VLLMSystemError",
     "GPUError",
     "GPUNotFoundError",
     "GPUMemoryError",
     "CUDAError",
     "DependencyError",
     "FileSystemError",
-    "PermissionError",
+    "VLLMPermissionError",
     "DiskSpaceError",
-    "MemoryError",
+    "VLLMMemoryError",
     "NetworkError",
-    "EnvironmentError",
+    "VLLMEnvironmentError",
     "ProcessError",
+    # Backward-compatible aliases (deprecated)
+    "SystemError",
+    "PermissionError",
+    "MemoryError",
+    "EnvironmentError",
     # Error handlers
     "ErrorReporter",
     "error_boundary",

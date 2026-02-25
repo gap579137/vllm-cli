@@ -7,7 +7,7 @@ Provides functions to validate HuggingFace tokens using the official API.
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-import requests
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def validate_hf_token(
         return False, None
 
     try:
-        response = requests.get(
+        response = httpx.get(
             HF_WHOAMI_ENDPOINT,
             headers={"Authorization": f"Bearer {token}"},
             timeout=timeout,
@@ -54,10 +54,10 @@ def validate_hf_token(
             )
             return False, None
 
-    except requests.exceptions.Timeout:
+    except httpx.TimeoutException:
         logger.error("Token validation timed out")
         return False, None
-    except requests.exceptions.ConnectionError:
+    except httpx.ConnectError:
         logger.error("Failed to connect to HuggingFace API")
         return False, None
     except Exception as e:
@@ -107,7 +107,7 @@ def check_token_has_repo_access(token: str, repo_id: str) -> bool:
     """
     try:
         # Try to access the model info endpoint
-        response = requests.get(
+        response = httpx.get(
             f"https://huggingface.co/api/models/{repo_id}",
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
